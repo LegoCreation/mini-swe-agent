@@ -1,0 +1,127 @@
+agent:
+  system_template: |
+    You are a helpful assistant with access to both bash commands and GitHub MCP tools.
+
+    Your response must contain exactly ONE bash code block with ONE command (or commands connected with && or ||)
+    OR one MCP tool call.
+    Include a THOUGHT section before your action where you explain your reasoning process.
+
+    <format_example>
+    Your reasoning and analysis here.
+
+    ```bash
+    your_command_here
+    ```
+    </format_example>
+
+    Alternatively, you can use GitHub MCP tools for GitHub operations:
+
+    <mcp_example>
+    Your reasoning about why to use this MCP tool.
+
+    @mcp_call{"tool": "list_issues", "args": {"owner": "SWE-agent", "repo": "mini-swe-agent", "state": "open"}}
+    </mcp_example>
+
+    ## Available MCP Tools
+
+    {{mcp_tools_info}}
+
+    Note: Bash commands with gh CLI or curl are often simpler and work just as well.
+
+    To finish, issue: `echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT`
+
+  instance_template: |
+    Please solve this issue: {{task}}
+
+    You can execute bash commands, use MCP tools, and edit files to implement changes.
+
+    ## Recommended Workflow
+    1. Analyze the codebase by finding and reading relevant files
+    2. Use MCP tools or bash/gh CLI for GitHub operations (your choice)
+    3. Create a script to reproduce the issue
+    4. Edit the source code to resolve the issue
+    5. Verify your fix works by running your script again
+    6. Test edge cases to ensure your fix is robust
+
+    ## Important Rules
+
+    1. Every response must contain exactly one action (bash command OR MCP tool call)
+    2. Actions must be in triple backticks or MCP call format
+    3. Directory/env changes are not persistent. Every action runs in a new subshell.
+       Use `cd /path && ...` or write to files to persist state
+    4. To finish: `echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT`
+
+    ## Example bash commands
+
+    ### GitHub operations with gh CLI:
+    ```bash
+    gh issue list --repo owner/repo --state open
+    ```
+
+    ### Create a new file:
+    ```bash
+    cat <<'EOF' > newfile.py
+    import numpy as np
+    hello = "world"
+    print(hello)
+    EOF
+    ```
+
+    ### Edit files with sed:
+    ```bash
+    sed -i 's/old_string/new_string/g' filename.py
+    ```
+
+    ### View file content:
+    ```bash
+    nl -ba filename.py | sed -n '10,20p'
+    ```
+
+  action_observation_template: |
+    <returncode>{{output.returncode if output.returncode is defined else output.exit_code}}</returncode>
+    {% if output.output | length < 10000 -%}
+    <output>
+    {{ output.output -}}
+    </output>
+    {%- else -%}
+    <warning>
+    The output of your last command was too long.
+    Please try a different command that produces less output.
+    </warning>
+    {%- set elided_chars = output.output | length - 10000 -%}
+    <output_head>
+    {{ output.output[:5000] }}
+    </output_head>
+    <elided_chars>
+    {{ elided_chars }} characters elided
+    </elided_chars>
+    <output_tail>
+    {{ output.output[-5000:] }}
+    </output_tail>
+    {%- endif -%}
+
+  format_error_template: |
+    Please provide EXACTLY ONE action in triple backticks or one MCP tool call.
+    Found {{actions|length}} actions.
+    To finish: `echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT`
+
+  enable_mcp_tools: true
+  mcp_tool_choice: "auto"
+  mode: "confirm"
+  step_limit: 0
+  cost_limit: 0
+
+environment:
+  image: "python:3.11"
+  cwd: "/testbed"
+  env:
+    PAGER: cat
+    MANPAGER: cat
+    LESS: -R
+    PIP_PROGRESS_BAR: 'off'
+    TQDM_DISABLE: '1'
+
+model:
+  model_kwargs:
+    temperature: 0.0
+    drop_params: true
