@@ -1,198 +1,85 @@
-"""GitHub MCP integration for mini-swe-agent.
+import requests
 
-This module provides a simple wrapper around the GitHub MCP server,
-allowing agents to interact with GitHub repositories, issues, and pull requests.
-"""
+class MCPTools:
+    def __init__(self, config):
+        self.config = config
 
-import json
-import logging
-import os
-from dataclasses import dataclass
-from pathlib import Path
+    def available_tools(self) -> str:
+        return """Available MCP tools:
+- search_repositories: Search GitHub repositories
+- get_file_contents: Get file contents from a repository
+- list_issues: List repository issues
+- get_commits: Get recent commits from a repository
+- list_pull_requests: List pull requests in a repository
+- get_contributors: List repository contributors
+- get_repo_details: Get detailed repository metadata
+- create_issue: Create a new issue in a repository
+- list_branches: List branches of a repository
+- create_repository: Create a new GitHub repository"""
 
-logger = logging.getLogger(__name__)
-
-
-@dataclass
-class MCPToolConfig:
-    """Configuration for MCP tools."""
-
-    github_token: str | None = None
-    enabled_tools: list[str] | None = None
-
-    def __post_init__(self):
-        if self.github_token is None:
-            self.github_token = os.getenv("GITHUB_TOKEN")
-        if self.enabled_tools is None:
-            self.enabled_tools = [
-                "search_repositories",
-                "search_code",
-                "create_or_update_file",
-                "get_file_contents",
-                "create_issue",
-                "list_issues",
-                "create_pull_request",
-                "list_commits",
-            ]
-
-
-class GitHubMCPClient:
-    """Simple client for GitHub MCP server integration.
-    
-    This provides a minimal interface to GitHub operations through MCP,
-    keeping with mini-swe-agent's philosophy of simplicity.
-    """
-
-    def __init__(self, config: MCPToolConfig | None = None):
-        self.config = config or MCPToolConfig()
-        self._tools = {}
-        self._initialize_tools()
-
-    def _initialize_tools(self):
-        """Initialize available MCP tools as simple function definitions."""
-        self._tools = {
-            "search_repositories": {
-                "description": "Search for GitHub repositories",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "query": {"type": "string", "description": "Search query"},
-                        "sort": {"type": "string", "enum": ["stars", "forks", "updated"]},
-                    },
-                    "required": ["query"],
-                },
-            },
-            "search_code": {
-                "description": "Search for code in GitHub repositories",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "query": {"type": "string", "description": "Code search query"},
-                    },
-                    "required": ["query"],
-                },
-            },
-            "get_file_contents": {
-                "description": "Get contents of a file from a GitHub repository",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "owner": {"type": "string", "description": "Repository owner"},
-                        "repo": {"type": "string", "description": "Repository name"},
-                        "path": {"type": "string", "description": "File path"},
-                    },
-                    "required": ["owner", "repo", "path"],
-                },
-            },
-            "create_or_update_file": {
-                "description": "Create or update a file in a GitHub repository",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "owner": {"type": "string"},
-                        "repo": {"type": "string"},
-                        "path": {"type": "string"},
-                        "content": {"type": "string"},
-                        "message": {"type": "string"},
-                        "branch": {"type": "string"},
-                    },
-                    "required": ["owner", "repo", "path", "content", "message", "branch"],
-                },
-            },
-            "create_issue": {
-                "description": "Create a new issue in a GitHub repository",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "owner": {"type": "string"},
-                        "repo": {"type": "string"},
-                        "title": {"type": "string"},
-                        "body": {"type": "string"},
-                    },
-                    "required": ["owner", "repo", "title"],
-                },
-            },
-            "list_issues": {
-                "description": "List issues in a GitHub repository",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "owner": {"type": "string"},
-                        "repo": {"type": "string"},
-                        "state": {"type": "string", "enum": ["open", "closed", "all"]},
-                    },
-                    "required": ["owner", "repo"],
-                },
-            },
-            "create_pull_request": {
-                "description": "Create a new pull request",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "owner": {"type": "string"},
-                        "repo": {"type": "string"},
-                        "title": {"type": "string"},
-                        "head": {"type": "string"},
-                        "base": {"type": "string"},
-                        "body": {"type": "string"},
-                    },
-                    "required": ["owner", "repo", "title", "head", "base"],
-                },
-            },
-            "list_commits": {
-                "description": "List commits in a repository",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "owner": {"type": "string"},
-                        "repo": {"type": "string"},
-                        "sha": {"type": "string"},
-                    },
-                    "required": ["owner", "repo"],
-                },
-            },
+    def execute_mcp_tool(self, tool: str, args: dict) -> dict:
+        """Execute MCP tool via GitHub API."""
+        headers = {
+            "Authorization": f"Bearer {self.config.github_token}",
+            "Accept": "application/vnd.github+json"
         }
 
-    def get_tools(self) -> list[dict]:
-        """Return list of available tools in OpenAI function format."""
-        return [
-            {"type": "function", "function": {"name": name, **tool}}
-            for name, tool in self._tools.items()
-            if name in self.config.enabled_tools
-        ]
+        base_url = "https://api.github.com"
 
-    def execute_tool(self, tool_name: str, arguments: dict) -> dict:
-        """Execute a tool call through MCP.
-        
-        For now, this returns a simulated response. In production,
-        this would connect to the actual GitHub MCP server.
-        """
-        if tool_name not in self._tools:
-            return {"error": f"Unknown tool: {tool_name}"}
+        match tool:
+            case "search_repositories":
+                return requests.get(f"{base_url}/search/repositories", headers=headers, params={"q": args["query"]}).json()
+            
+            case "get_file_contents":
+                return requests.get(f"{base_url}/repos/{args['owner']}/{args['repo']}/contents/{args['path']}", headers=headers).json()
+            
+            case "list_issues":
+                return requests.get(f"{base_url}/repos/{args['owner']}/{args['repo']}/issues", headers=headers, params=args.get("params", {})).json()
+            
+            case "get_commits":
+                return requests.get(f"{base_url}/repos/{args['owner']}/{args['repo']}/commits", headers=headers, params=args.get("params", {})).json()
+            
+            case "list_pull_requests":
+                return requests.get(f"{base_url}/repos/{args['owner']}/{args['repo']}/pulls", headers=headers, params=args.get("params", {})).json()
+            
+            case "get_contributors":
+                return requests.get(f"{base_url}/repos/{args['owner']}/{args['repo']}/contributors", headers=headers).json()
+            
+            case "get_repo_details":
+                return requests.get(f"{base_url}/repos/{args['owner']}/{args['repo']}", headers=headers).json()
+            
+            case "create_issue":
+                data = {
+                    "title": args["title"],
+                    "body": args.get("body", ""),
+                    "assignees": args.get("assignees", [])
+                }
+                return requests.post(f"{base_url}/repos/{args['owner']}/{args['repo']}/issues", headers=headers, json=data).json()
+            
+            case "list_branches":
+                return requests.get(f"{base_url}/repos/{args['owner']}/{args['repo']}/branches", headers=headers).json()
+            
+            case "create_repository":
+                """
+                Create a new GitHub repository for the authenticated user.
+                Args:
+                    name (str): Repository name (required)
+                    description (str): Repository description
+                    private (bool): True for private repo
+                    auto_init (bool): True to initialize with a README
+                """
+                data = {
+                    "name": args["name"],
+                    "description": args.get("description", ""),
+                    "private": args.get("private", False),
+                    "auto_init": args.get("auto_init", True)
+                }
+                # For organizations: use POST /orgs/{org}/repos instead
+                if "org" in args:
+                    url = f"{base_url}/orgs/{args['org']}/repos"
+                else:
+                    url = f"{base_url}/user/repos"
+                return requests.post(url, headers=headers, json=data).json()
 
-        logger.info(f"Executing MCP tool: {tool_name} with args: {arguments}")
-
-        # This is where you'd connect to the actual MCP server
-        # For now, return a placeholder that guides the agent to use bash
-        return {
-            "status": "mcp_placeholder",
-            "message": f"MCP tool '{tool_name}' called. In this minimal implementation, "
-            f"please use bash commands with gh CLI or curl to accomplish this task instead. "
-            f"Arguments received: {json.dumps(arguments, indent=2)}",
-        }
-
-    def format_tools_for_prompt(self) -> str:
-        """Format available tools as a string for inclusion in prompts."""
-        tools = self.get_tools()
-        if not tools:
-            return ""
-
-        lines = ["Available GitHub MCP Tools:"]
-        for tool in tools:
-            func = tool["function"]
-            lines.append(f"- {func['name']}: {func.get('description', 'No description')}")
-
-        lines.append(
-            "\nNote: You can use these tools or standard bash commands (gh, curl, git) to interact with GitHub."
-        )
-        return "\n".join(lines)
+            case _:
+                return {"error": f"Unknown tool: {tool}"}

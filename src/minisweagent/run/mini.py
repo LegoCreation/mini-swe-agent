@@ -21,6 +21,7 @@ from minisweagent.agents.interactive_textual import TextualAgent
 from minisweagent.config import builtin_config_dir, get_config_path
 from minisweagent.environments.local import LocalEnvironment
 from minisweagent.models import get_model
+from minisweagent.agents.mcp_agent import MCPAgent
 from minisweagent.run.extra.config import configure_if_first_time
 from minisweagent.run.utils.save import save_traj
 from minisweagent.utils.log import logger
@@ -54,9 +55,14 @@ def main(
     cost_limit: float | None = typer.Option(None, "-l", "--cost-limit", help="Cost limit. Set to 0 to disable."),
     config_spec: Path = typer.Option(DEFAULT_CONFIG, "-c", "--config", help="Path to config file"),
     output: Path | None = typer.Option(DEFAULT_OUTPUT, "-o", "--output", help="Output trajectory file"),
+    github_token: str | None = typer.Option(None, "--github-token", help="Github Token for MCP operations", rich_help_panel="Advanced"),
+    enable_mcp: bool = typer.Option(False, "-mcp","--enable-mcp/--no-enable-mcp", help="Enable MCP tools (GitHub operations)", rich_help_panel="Advanced"),
     exit_immediately: bool = typer.Option( False, "--exit-immediately", help="Exit immediately when the agent wants to finish instead of prompting.", rich_help_panel="Advanced"),
 ) -> Any:
     # fmt: on
+    if enable_mcp:
+        config_spec = Path(os.getenv("MSWEA_MCP_CONFIG_PATH", builtin_config_dir / "mcp_agent.yaml"))
+    
     configure_if_first_time()
     config_path = get_config_path(config_spec)
     console.print(f"Loading agent config from [bold green]'{config_path}'[/bold green]")
@@ -86,12 +92,15 @@ def main(
     model = get_model(model_name, config.get("model", {}))
     env = LocalEnvironment(**config.get("env", {}))
 
-    # Both visual flag and the MSWEA_VISUAL_MODE_DEFAULT flip the mode, so it's essentially a XOR
-    agent_class = InteractiveAgent
-    if visual == (os.getenv("MSWEA_VISUAL_MODE_DEFAULT", "false") == "false"):
-        agent_class = TextualAgent
-
-    agent = agent_class(model, env, **config.get("agent", {}))
+    if enable_mcp:
+        agent = MCPAgent(model, env, **config.get("agent", {}))
+        console.print("[bold green]MCP tools enabled.[/bold green]")
+    else:
+        # Both visual flag and the MSWEA_VISUAL_MODE_DEFAULT flip the mode, so it's essentially a XOR
+        agent_class = InteractiveAgent
+        if visual == (os.getenv("MSWEA_VISUAL_MODE_DEFAULT", "false") == "false"):
+            agent_class = TextualAgent
+        agent = agent_class(model, env, **config.get("agent", {}))
     exit_status, result, extra_info = None, None, None
     try:
         exit_status, result = agent.run(task)  # type: ignore[arg-type]

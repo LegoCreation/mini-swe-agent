@@ -26,7 +26,7 @@ agent:
 
     {{mcp_tools_info}}
 
-    Note: Bash commands with gh CLI or curl are often simpler and work just as well.
+    Note: Prefer using MCP tools for GitHub operations over bash/gh CLI.
 
     To finish, issue: `echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT`
 
@@ -37,7 +37,7 @@ agent:
 
     ## Recommended Workflow
     1. Analyze the codebase by finding and reading relevant files
-    2. Use MCP tools or bash/gh CLI for GitHub operations (your choice)
+    2. Use MCP tools for GitHub operations
     3. Create a script to reproduce the issue
     4. Edit the source code to resolve the issue
     5. Verify your fix works by running your script again
@@ -51,12 +51,12 @@ agent:
        Use `cd /path && ...` or write to files to persist state
     4. To finish: `echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT`
 
-    ## Example bash commands
+    ## Example MCP tool calls
 
-    ### GitHub operations with gh CLI:
-    ```bash
-    gh issue list --repo owner/repo --state open
-    ```
+    ### GitHub operations:
+    @mcp_call{"tool": "list_issues", "args": {"owner": "SWE-agent", "repo": "mini-swe-agent", "state": "open"}}
+
+    ## Example bash commands
 
     ### Create a new file:
     ```bash
