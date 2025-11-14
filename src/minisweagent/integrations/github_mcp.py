@@ -1,11 +1,12 @@
 import requests
+from minisweagent.integrations.mcp_tools import MCPTools
 
-class MCPTools:
+class GithubMCPTools(MCPTools):
     def __init__(self, config):
-        self.config = config
+        super().__init__(config)
 
     def available_tools(self) -> str:
-        return """Available MCP tools:
+        return """
 - search_repositories: Search GitHub repositories
 - get_file_contents: Get file contents from a repository
 - list_issues: List repository issues
